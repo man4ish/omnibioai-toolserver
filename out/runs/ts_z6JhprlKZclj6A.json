@@ -1,0 +1,26 @@
+{
+  "run_id": "ts_z6JhprlKZclj6A",
+  "tool_id": "enrichr_pathway",
+  "state": "FAILED",
+  "created_epoch": 1768060424,
+  "updated_epoch": 1768060425,
+  "inputs": {
+    "summary": "stored externally"
+  },
+  "resources": {
+    "cpu": 1,
+    "ram_gb": 1
+  },
+  "logs": [
+    "Queued",
+    "Starting tool: enrichr_pathway",
+    "Enrichr: addList",
+    "FAILED: Client error '400 ' for url 'https://maayanlab.cloud/Enrichr/addList'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+  ],
+  "results": null,
+  "error": {
+    "code": "EXEC_FAILED",
+    "message": "Client error '400 ' for url 'https://maayanlab.cloud/Enrichr/addList'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400",
+    "trace": "Traceback (most recent call last):\n  File \"/home/manish/Desktop/machine/toolserver_template/toolserver/executor.py\", line 40, in work\n    res = handler.run(full_inputs, resources, append_log)\n  File \"/home/manish/Desktop/machine/toolserver_template/toolserver/tools/enrichr_pathway.py\", line 40, in _run\n    r.raise_for_status()\n    ~~~~~~~~~~~~~~~~~~^^\n  File \"/home/manish/Desktop/machine/toolserver_template/.venv/lib/python3.13/site-packages/httpx/_models.py\", line 829, in raise_for_status\n    raise HTTPStatusError(message, request=request, response=self)\nhttpx.HTTPStatusError: Client error '400 ' for url 'https://maayanlab.cloud/Enrichr/addList'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400\n"
+  }
+}
