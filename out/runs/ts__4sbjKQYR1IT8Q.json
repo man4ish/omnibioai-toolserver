@@ -1,0 +1,361 @@
+{
+  "run_id": "ts__4sbjKQYR1IT8Q",
+  "tool_id": "enrichr_pathway",
+  "state": "COMPLETED",
+  "created_epoch": 1768090651,
+  "updated_epoch": 1768090652,
+  "inputs": {
+    "summary": "stored externally"
+  },
+  "resources": {
+    "cpu": 1,
+    "ram_gb": 1
+  },
+  "logs": [
+    "Queued",
+    "Starting tool: enrichr_pathway",
+    "Enrichr: addList",
+    "Enrichr: userListId=114839637",
+    "Enrichr: enrich WikiPathways_2024_Human",
+    "Enrichr: enrich Reactome_2022",
+    "Completed"
+  ],
+  "results": {
+    "ok": true,
+    "userListId": "114839637",
+    "results": {
+      "WikiPathways_2024_Human": {
+        "library": "WikiPathways_2024_Human",
+        "columns": [
+          "rank",
+          "term",
+          "p_value",
+          "z_score",
+          "combined_score",
+          "overlap_genes",
+          "adj_p_value",
+          "old_p_value",
+          "old_adj_p_value"
+        ],
+        "sort_by": "adj_p_value",
+        "top_n": 10,
+        "n_terms": 124,
+        "items": [
+          {
+            "rank": 1,
+            "term": "Glioblastoma Signaling WP2261",
+            "p_value": 2.6490353704884586e-7,
+            "z_score": 756.3417721518987,
+            "combined_score": 11453.964230125095,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53",
+              "EGFR"
+            ],
+            "adj_p_value": 0.000032848038594056886,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 2,
+            "term": "Breast Cancer Pathway WP4262",
+            "p_value": 1.7806884983935374e-6,
+            "z_score": 394.27152317880797,
+            "combined_score": 5219.56768825499,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53",
+              "EGFR"
+            ],
+            "adj_p_value": 0.00011040268690039932,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 3,
+            "term": "RIOK1 And RIOK2 In EGFR And PI3K Mediated Tumorigenesis WP3873",
+            "p_value": 3.1471866542246024e-6,
+            "z_score": 1537.1538461538462,
+            "combined_score": 19474.204582244136,
+            "overlap_genes": [
+              "TP53",
+              "EGFR"
+            ],
+            "adj_p_value": 0.00013008371504128358,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 4,
+            "term": "Gastric Cancer Network 2 WP2363",
+            "p_value": 0.000013922906066492982,
+            "z_score": 688.5172413793103,
+            "combined_score": 7698.982687376362,
+            "overlap_genes": [
+              "TP53",
+              "EGFR"
+            ],
+            "adj_p_value": 0.00041346300205309915,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 5,
+            "term": "PI3K Akt Signaling WP4172",
+            "p_value": 0.000018897535492358587,
+            "z_score": 176.0686567164179,
+            "combined_score": 1915.0070546642141,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53",
+              "EGFR"
+            ],
+            "adj_p_value": 0.00041346300205309915,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 6,
+            "term": "Bladder Cancer WP2828",
+            "p_value": 0.00002334065334170721,
+            "z_score": 525.2105263157895,
+            "combined_score": 5601.535147297049,
+            "overlap_genes": [
+              "TP53",
+              "EGFR"
+            ],
+            "adj_p_value": 0.00041346300205309915,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 7,
+            "term": "ATM Signaling WP2516",
+            "p_value": 0.00002334065334170721,
+            "z_score": 525.2105263157895,
+            "combined_score": 5601.535147297049,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.00041346300205309915,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 8,
+            "term": "Integrated Cancer Pathway WP1971",
+            "p_value": 0.00002830052035610487,
+            "z_score": 475.0952380952381,
+            "combined_score": 4975.496817380962,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.0004386580655196255,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 9,
+            "term": "Hepatitis C And Hepatocellular Carcinoma WP3646",
+            "p_value": 0.000035169529965184864,
+            "z_score": 424.4468085106383,
+            "combined_score": 4352.842290853384,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.00045424294566142557,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 10,
+            "term": "Photodynamic Therapy Induced AP 1 Survival Signaling WP3611",
+            "p_value": 0.0000366324956178569,
+            "z_score": 415.5833333333333,
+            "combined_score": 4245.007066016978,
+            "overlap_genes": [
+              "TP53",
+              "EGFR"
+            ],
+            "adj_p_value": 0.00045424294566142557,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          }
+        ]
+      },
+      "Reactome_2022": {
+        "library": "Reactome_2022",
+        "columns": [
+          "rank",
+          "term",
+          "p_value",
+          "z_score",
+          "combined_score",
+          "overlap_genes",
+          "adj_p_value",
+          "old_p_value",
+          "old_adj_p_value"
+        ],
+        "sort_by": "adj_p_value",
+        "top_n": 10,
+        "n_terms": 181,
+        "items": [
+          {
+            "rank": 1,
+            "term": "Recruitment And ATM-mediated Phosphorylation Of Repair And Signal Proteins At DNA Double Strand Breaks R-HSA-5693565",
+            "p_value": 0.00005289506914983997,
+            "z_score": 343.7586206896552,
+            "combined_score": 3385.060038922896,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.0034090472903421064,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 2,
+            "term": "DNA Double Strand Break Response R-HSA-5693606",
+            "p_value": 0.000054684486873819574,
+            "z_score": 337.91525423728814,
+            "combined_score": 3316.2768174499392,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.0034090472903421064,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 3,
+            "term": "TP53 Regulates Transcription Of DNA Repair Genes R-HSA-6796648",
+            "p_value": 0.00005650354624876419,
+            "z_score": 332.26666666666665,
+            "combined_score": 3249.9690978054937,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.0034090472903421064,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 4,
+            "term": "G2/M DNA Damage Checkpoint R-HSA-69473",
+            "p_value": 0.00008734237745695949,
+            "z_score": 265.61333333333334,
+            "combined_score": 2482.3358331058284,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.003952242579927417,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 5,
+            "term": "Regulation Of TP53 Activity Thru Phosphorylation R-HSA-6804756",
+            "p_value": 0.00011944749872356927,
+            "z_score": 226.22727272727272,
+            "combined_score": 2043.4280703828779,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.004323999453793208,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 6,
+            "term": "G2/M Checkpoints R-HSA-69481",
+            "p_value": 0.0003231780505518367,
+            "z_score": 135.95890410958904,
+            "combined_score": 1092.743471633036,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.008079442626190765,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 7,
+            "term": "DNA Double-Strand Break Repair R-HSA-5693532",
+            "p_value": 0.00032755313026878297,
+            "z_score": 135.02721088435374,
+            "combined_score": 1083.4394749738105,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.008079442626190765,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 8,
+            "term": "Regulation Of TP53 Activity R-HSA-5633007",
+            "p_value": 0.0003636015168011833,
+            "z_score": 128.00645161290322,
+            "combined_score": 1013.740952317167,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.008079442626190765,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 9,
+            "term": "SUMO E3 Ligases SUMOylate Target Proteins R-HSA-3108232",
+            "p_value": 0.00041620529846492633,
+            "z_score": 119.4578313253012,
+            "combined_score": 929.8994087044406,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.008079442626190765,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          },
+          {
+            "rank": 10,
+            "term": "SUMOylation R-HSA-2990846",
+            "p_value": 0.0004463780456458986,
+            "z_score": 115.25581395348837,
+            "combined_score": 889.1230347572201,
+            "overlap_genes": [
+              "BRCA1",
+              "TP53"
+            ],
+            "adj_p_value": 0.008079442626190765,
+            "old_p_value": 0.0,
+            "old_adj_p_value": 0.0
+          }
+        ]
+      }
+    },
+    "meta": {
+      "sort_by": "adj_p_value",
+      "top_n": 10,
+      "return_mode": "top",
+      "libraries": [
+        "WikiPathways_2024_Human",
+        "Reactome_2022"
+      ],
+      "n_genes": 6
+    }
+  },
+  "error": null
+}
