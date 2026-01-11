@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-import time
 import secrets
+import time
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from toolserver.models import ValidateRequest, RunCreateRequest
-from toolserver.store import RunStore
-from toolserver.registry import ToolRegistry
 from toolserver.executor import Executor
+from toolserver.models import RunCreateRequest, ValidateRequest
+from toolserver.registry import ToolRegistry
+from toolserver.store import RunStore
 from toolserver.tools import register_tools
 
 
@@ -116,7 +117,11 @@ def create_app() -> FastAPI:
         if not rec:
             return {"ok": False, "error": {"code": "NOT_FOUND", "message": "unknown run"}}
         if rec.state != "COMPLETED":
-            return {"ok": False, "error": {"code": "NOT_READY", "message": f"state={rec.state}"}, "state": rec.state}
+            return {
+                "ok": False, 
+                "error": {"code": "NOT_READY", "message": f"state={rec.state}"},
+                "state": rec.state,
+            }
         return rec.results or {"ok": True, "results": {}}
 
     @app.get("/health")

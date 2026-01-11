@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..registry import ToolHandler
-from .enrichr_pathway import _validate, _run
+from .enrichr_pathway import _run, _validate
 
 
 def register_tools(registry):

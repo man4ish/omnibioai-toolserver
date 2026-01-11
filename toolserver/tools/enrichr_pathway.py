@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Callable, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
+
 import httpx
 
 
@@ -34,7 +35,12 @@ def _validate(inputs: Dict[str, Any], resources: Dict[str, Any]) -> Dict[str, An
     sort_by = inputs.get("sort_by")
     if sort_by is not None:
         if str(sort_by) not in ("adj_p_value", "p_value", "combined_score"):
-            errors.append({"field": "sort_by", "message": "sort_by must be one of: adj_p_value, p_value, combined_score"})
+            errors.append(
+                {
+                    "field": "sort_by", 
+                    "message": "sort_by must be one of: adj_p_value, p_value, combined_score"
+                }
+            )
 
     return {"ok": len(errors) == 0, "errors": errors, "warnings": []}
 

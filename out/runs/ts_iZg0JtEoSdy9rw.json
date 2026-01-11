@@ -1,0 +1,39 @@
+{
+  "run_id": "ts_iZg0JtEoSdy9rw",
+  "tool_id": "enrichr_pathway",
+  "state": "COMPLETED",
+  "created_epoch": 1768161124,
+  "updated_epoch": 1768161124,
+  "inputs": {
+    "summary": "stored externally"
+  },
+  "resources": {},
+  "logs": [
+    "Queued",
+    "Starting tool: enrichr_pathway",
+    "FAKE RUN called",
+    "Completed"
+  ],
+  "results": {
+    "ok": true,
+    "results": {
+      "WikiPathways_2024_Human": {
+        "library": "WikiPathways_2024_Human",
+        "columns": [
+          "rank",
+          "term",
+          "p_value"
+        ],
+        "items": [
+          {
+            "rank": 1,
+            "term": "DummyPathway",
+            "p_value": 1e-6
+          }
+        ],
+        "n_terms": 1
+      }
+    }
+  },
+  "error": null
+}

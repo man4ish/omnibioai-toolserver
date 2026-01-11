@@ -3,11 +3,11 @@ from __future__ import annotations
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Dict, Any
+from typing import Any, Dict
 
 from .models import RunRecord
-from .store import RunStore
 from .registry import ToolRegistry
+from .store import RunStore
 
 
 class Executor:

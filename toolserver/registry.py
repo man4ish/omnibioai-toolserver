@@ -5,7 +5,6 @@ from typing import Any, Callable, Dict
 
 from .models import ServerCapabilities
 
-
 ValidateFn = Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
 RunFn = Callable[[Dict[str, Any], Dict[str, Any], Callable[[str], None]], Dict[str, Any]]
 
