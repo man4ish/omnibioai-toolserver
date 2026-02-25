@@ -1,0 +1,296 @@
+# ---- REST API Tools (Config-Driven, No Code Needed) ----
+
+  - tool_id: uniprot_search
+    display_name: UniProt Protein Search
+    description: Search protein sequences via UniProt REST API
+    adapter_type: rest_api
+
+    config:
+      base_url: "https://rest.uniprot.org"
+      endpoint: "/uniprotkb/search"
+      method: GET
+      timeout_seconds: 30
+      auth:
+        type: none
+      response_mapping:
+        results: "$.results"
+        total: "$.totalResults"
+      headers:
+        Accept: "application/json"
+
+    inputs_schema:
+      type: object
+      required: [query]
+      additionalProperties: false
+      properties:
+        query:
+          type: string
+          description: UniProt search query
+        format:
+          type: string
+          default: json
+          enum: [json, fasta, tsv]
+        size:
+          type: integer
+          default: 25
+          minimum: 1
+          maximum: 500
+
+    outputs_schema:
+      type: object
+      properties:
+        ok: { type: boolean }
+        results: { type: array }
+        total: { type: integer }
+
+    tags: [uniprot, protein, annotation]
+
+  - tool_id: ensembl_gene_lookup
+    display_name: Ensembl Gene Lookup
+    description: Gene lookup via Ensembl REST API
+    adapter_type: rest_api
+
+    config:
+      base_url: "https://rest.ensembl.org"
+      endpoint: "/lookup/symbol/{species}/{symbol}"
+      method: GET
+      timeout_seconds: 30
+      auth:
+        type: none
+      path_params:
+        species: "inputs.species"
+        symbol: "inputs.symbol"
+      headers:
+        Content-Type: "application/json"
+        Accept: "application/json"
+
+    inputs_schema:
+      type: object
+      required: [symbol]
+      additionalProperties: false
+      properties:
+        symbol:
+          type: string
+          description: Gene symbol e.g. BRCA2
+        species:
+          type: string
+          default: human
+          description: Species name
+
+    outputs_schema:
+      type: object
+      properties:
+        ok: { type: boolean }
+        gene_id: { type: string }
+        chromosome: { type: string }
+        start: { type: integer }
+        end: { type: integer }
+        biotype: { type: string }
+
+    tags: [ensembl, gene, annotation]
+
+  - tool_id: pubmed_search
+    display_name: PubMed Literature Search
+    description: Search biomedical literature via NCBI E-utilities
+    adapter_type: rest_api
+
+    config:
+      base_url: "https://eutils.ncbi.nlm.nih.gov"
+      endpoint: "/entrez/eutils/esearch.fcgi"
+      method: GET
+      timeout_seconds: 30
+      auth:
+        type: none
+      headers:
+        Accept: "application/json"
+      static_params:
+        db: pubmed
+        retmode: json
+
+    inputs_schema:
+      type: object
+      required: [query]
+      additionalProperties: false
+      properties:
+        query:
+          type: string
+          description: PubMed search query
+        retmax:
+          type: integer
+          default: 20
+          minimum: 1
+          maximum: 100
+        sort:
+          type: string
+          default: relevance
+          enum: [relevance, pub_date]
+
+    outputs_schema:
+      type: object
+      properties:
+        ok: { type: boolean }
+        pmids: { type: array }
+        total: { type: integer }
+
+    tags: [pubmed, literature, search]
+
+  - tool_id: clinvar_search
+    display_name: ClinVar Variant Search
+    description: Search clinical variant significance via ClinVar
+    adapter_type: rest_api
+
+    config:
+      base_url: "https://eutils.ncbi.nlm.nih.gov"
+      endpoint: "/entrez/eutils/esearch.fcgi"
+      method: GET
+      timeout_seconds: 30
+      auth:
+        type: none
+      static_params:
+        db: clinvar
+        retmode: json
+      headers:
+        Accept: "application/json"
+
+    inputs_schema:
+      type: object
+      required: [query]
+      additionalProperties: false
+      properties:
+        query:
+          type: string
+          description: Gene name or variant
+        retmax:
+          type: integer
+          default: 20
+
+    outputs_schema:
+      type: object
+      properties:
+        ok: { type: boolean }
+        variant_ids: { type: array }
+        total: { type: integer }
+
+    tags: [clinvar, variants, clinical]
+
+  - tool_id: string_db
+    display_name: STRING Protein Interactions
+    description: Protein interaction network via STRING DB
+    adapter_type: rest_api
+
+    config:
+      base_url: "https://string-db.org"
+      endpoint: "/api/json/network"
+      method: GET
+      timeout_seconds: 30
+      auth:
+        type: none
+      static_params:
+        caller_identity: omnibioai
+
+    inputs_schema:
+      type: object
+      required: [identifiers]
+      additionalProperties: false
+      properties:
+        identifiers:
+          type: string
+          description: Protein identifiers comma separated
+        species:
+          type: integer
+          default: 9606
+          description: NCBI taxon ID (9606 = human)
+        required_score:
+          type: integer
+          default: 400
+          minimum: 0
+          maximum: 1000
+        limit:
+          type: integer
+          default: 10
+
+    outputs_schema:
+      type: object
+      properties:
+        ok: { type: boolean }
+        interactions: { type: array }
+        n_interactions: { type: integer }
+
+    tags: [string, protein, interactions, network]
+
+  - tool_id: kegg_pathway
+    display_name: KEGG Pathway Search
+    description: Search KEGG pathway database
+    adapter_type: rest_api
+
+    config:
+      base_url: "https://rest.kegg.jp"
+      endpoint: "/find/pathway/{query}"
+      method: GET
+      timeout_seconds: 30
+      auth:
+        type: none
+      path_params:
+        query: "inputs.query"
+      response_format: text
+      text_parser: kegg_list
+
+    inputs_schema:
+      type: object
+      required: [query]
+      additionalProperties: false
+      properties:
+        query:
+          type: string
+          description: Pathway search term
+
+    outputs_schema:
+      type: object
+      properties:
+        ok: { type: boolean }
+        pathways: { type: array }
+        n_pathways: { type: integer }
+
+    tags: [kegg, pathway, annotation]
+
+  - tool_id: disgenet_search
+    display_name: DisGeNET Gene-Disease Search
+    description: Gene disease associations via DisGeNET
+    adapter_type: rest_api
+
+    config:
+      base_url: "https://www.disgenet.org"
+      endpoint: "/api/gda/gene/{gene_id}"
+      method: GET
+      timeout_seconds: 30
+      auth:
+        type: api_key
+        header: "Authorization"
+        key: "${DISGENET_API_KEY}"
+      path_params:
+        gene_id: "inputs.gene_id"
+      headers:
+        Accept: "application/json"
+
+    inputs_schema:
+      type: object
+      required: [gene_id]
+      additionalProperties: false
+      properties:
+        gene_id:
+          type: string
+          description: Gene symbol or NCBI gene ID
+        limit:
+          type: integer
+          default: 10
+          minimum: 1
+          maximum: 100
+
+    outputs_schema:
+      type: object
+      properties:
+        ok: { type: boolean }
+        associations: { type: array }
+        n_associations: { type: integer }
+
+    tags: [disgenet, disease, gene, associations]
