@@ -3,7 +3,7 @@
 A standalone **HTTP ToolServer** for the **OmniBioAI** ecosystem.
 
 This service implements the REST contract expected by
-`omnibioai-tool-exec`’s `HttpToolServerAdapter`, enabling **secure, validated, and reproducible execution of REST-backed bioinformatics tools** (e.g. Enrichr, annotation services, external APIs).
+`omnibioai-tes (Tool Execution Service, legacy package name: `omnibioai-tes`) `HttpToolServerAdapter`, enabling **secure, validated, and reproducible execution of REST-backed bioinformatics tools** (e.g. Enrichr, annotation services, external APIs).
 
 It is designed to run **independently** and be registered as a remote execution server in OmniBioAI TES.
 
@@ -32,7 +32,7 @@ The ToolServer exposes the following endpoints:
   Retrieve structured tool results once the run is completed.
 
 This contract matches the expectations of
-**`omnibioai-tool-exec` → `HttpToolServerAdapter`**.
+**`omnibioai-tes` → `HttpToolServerAdapter`**.
 
 ---
 
@@ -83,7 +83,7 @@ curl http://127.0.0.1:9090/capabilities | python -m json.tool
 
 ## Integration with OmniBioAI TES
 
-Register this service as a server in `omnibioai-tool-exec`:
+Register this service as a server in `omnibioai-tes`:
 
 ```yaml
 - server_id: enrichment_remote
