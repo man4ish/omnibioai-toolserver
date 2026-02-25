@@ -11,8 +11,8 @@ def client(monkeypatch, tmp_path):
     # Ensure RunStore writes into temp
     monkeypatch.setenv("TOOLSERVER_RUN_STORE_DIR", str(tmp_path / "runs"))
 
-    # Patch the tool run function to avoid network
-    import toolserver.tools as tools_mod
+    # Must patch BEFORE app creation so registry captures fake_run
+    import toolserver.tools.enrichr_pathway as enrichr_mod
 
     def fake_run(inputs, resources, log):
         log("FAKE RUN called")
@@ -29,9 +29,11 @@ def client(monkeypatch, tmp_path):
             },
         }
 
-    monkeypatch.setattr(tools_mod, "_run", fake_run, raising=True)
+    # Patch BEFORE create_app so register_tools() captures fake_run
+    monkeypatch.setattr(enrichr_mod, "_run", fake_run, raising=True)
 
-    from toolserver_app import create_app
+    # Import and create app AFTER patch is applied
+    from toolserver_app import create_app  # noqa: E402
 
     app = create_app()
     return TestClient(app)

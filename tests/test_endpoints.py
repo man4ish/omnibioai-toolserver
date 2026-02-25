@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+import time
+
+
 def test_health(client):
     r = client.get("/health")
     assert r.status_code == 200
@@ -51,7 +56,7 @@ def test_create_run_and_poll_to_complete(client):
     run_id = r.json()["run_id"]
     assert run_id.startswith("ts_")
 
-    # Poll until COMPLETED (short loop; fake run sleeps 0.01s)
+    # Poll until COMPLETED — sleep between polls to allow background thread to finish
     state = None
     for _ in range(50):
         rr = client.get(f"/runs/{run_id}")
@@ -59,6 +64,8 @@ def test_create_run_and_poll_to_complete(client):
         state = rr.json()["state"]
         if state == "COMPLETED":
             break
+        time.sleep(0.05)  # ← fix: give background thread time to complete
+
     assert state == "COMPLETED"
 
     logs = client.get(f"/runs/{run_id}/logs").json()["logs"]

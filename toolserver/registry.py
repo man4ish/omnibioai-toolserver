@@ -1,8 +1,9 @@
-# registry.py — fix mutable default
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
+
+from .models import ServerCapabilities  # ← fix: was missing
 
 ValidateFn = Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
 RunFn = Callable[[Dict[str, Any], Dict[str, Any], Callable[[str], None]], Dict[str, Any]]
@@ -14,7 +15,7 @@ class ToolHandler:
     validate: ValidateFn
     run: RunFn
     version: str = "v1"
-    features: Optional[Dict[str, Any]] = None  # ← already Optional, just confirming
+    features: Optional[Dict[str, Any]] = None
 
     def has_feature(self, key: str) -> bool:
         return bool(self.features and key in self.features)

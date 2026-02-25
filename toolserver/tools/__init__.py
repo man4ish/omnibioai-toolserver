@@ -1,13 +1,11 @@
-# toolserver/tools/__init__.py
 from __future__ import annotations
 
 import yaml
-from dataclasses import fields
 from pathlib import Path
 from typing import Optional
 
 from ..registry import ToolHandler, ToolRegistry
-from .enrichr_pathway import _run as enrichr_run, _validate as enrichr_validate
+from . import enrichr_pathway as enrichr_mod
 
 
 def register_tools(registry: ToolRegistry, yaml_path: Optional[str] = None) -> None:
@@ -18,13 +16,16 @@ def register_tools(registry: ToolRegistry, yaml_path: Optional[str] = None) -> N
     """
 
     # ------------------------------------------------------------------
-    # 1. Custom handlers — keep exactly as before
+    # 1. Custom handlers
+    # Use lambda wrappers so monkeypatch on the module works correctly
+    # in tests — the wrapper looks up _run/_validate at call time
+    # not at registration time.
     # ------------------------------------------------------------------
     registry.register(
         ToolHandler(
             tool_id="enrichr_pathway",
-            validate=enrichr_validate,
-            run=enrichr_run,
+            validate=lambda inputs, resources: enrichr_mod._validate(inputs, resources),
+            run=lambda inputs, resources, log: enrichr_mod._run(inputs, resources, log),
             version="v1",
             features={
                 "libraries_default": [
@@ -81,7 +82,6 @@ def _register_from_yaml(yaml_path: str, registry: ToolRegistry) -> None:
                 validate=handler._validate,
                 run=handler._run,
                 version="v1",
-                # features advertised via /capabilities
                 features={
                     "display_name": tool_config.get("display_name", tool_id),
                     "description": tool_config.get("description", ""),
