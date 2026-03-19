@@ -13,14 +13,12 @@ Run with:
 from __future__ import annotations
 
 import time
-from typing import Any, Dict
 
 import pytest
 from fastapi.testclient import TestClient
 
 from toolserver.models import RunRecord
 from toolserver.store import RunStore
-
 
 # ===========================================================================
 # Shared fake run / helpers
@@ -183,7 +181,10 @@ class TestValidate:
         assert resp.json()["ok"] is False
 
     def test_unknown_tool_error_code(self, client):
-        errors = client.post("/validate", json={"tool_id": "ghost", "inputs": {}, "resources": {}}).json()["errors"]
+        resp = client.post(
+            "/validate", json={"tool_id": "ghost", "inputs": {}, "resources": {}}
+        )
+        errors = resp.json()["errors"]
         assert any(e["code"] == "UNKNOWN_TOOL" for e in errors)
 
     def test_empty_genes_list_ok_false(self, client):
@@ -277,7 +278,10 @@ class TestCreateRun:
         assert resp.json()["error"]["code"] == "VALIDATION_FAILED"
 
     def test_unknown_tool_returns_400(self, client):
-        assert client.post("/runs", json={"tool_id": "ghost", "inputs": {}, "resources": {}}).status_code == 400
+        resp = client.post(
+            "/runs", json={"tool_id": "ghost", "inputs": {}, "resources": {}}
+        )
+        assert resp.status_code == 400
 
     def test_missing_tool_id_returns_422(self, client):
         assert client.post("/runs", json={"inputs": VALID_INPUTS}).status_code == 422

@@ -8,18 +8,18 @@ Run with:
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock, patch, call
 from typing import Any, Dict, List
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from toolserver.tools.enrichr_pathway import (
-    _validate,
-    _row_to_item,
     _normalize_enrichr_payload,
-    _sort_and_top,
+    _row_to_item,
     _run,
+    _sort_and_top,
+    _validate,
 )
-
 
 # ===========================================================================
 # Helpers / fixtures
@@ -347,7 +347,8 @@ class TestSortAndTop:
 
     def test_none_adj_p_value_sorted_last(self):
         items = [
-            {**_make_items(1)[0], "adj_p_value": None, "p_value": None, "combined_score": None, "term": "Null Item"},
+            {**_make_items(1)[0],
+             "adj_p_value": None, "p_value": None, "combined_score": None, "term": "Null Item"},
             {**_make_items(1)[0], "adj_p_value": 0.001, "term": "Good Item"},
         ]
         result = _sort_and_top(items, sort_by="adj_p_value", top_n=2)
@@ -468,7 +469,7 @@ class TestRun:
         assert "TP53" in gene_blob
         assert "BRCA1" in gene_blob
         # Empty string should not appear as a gene
-        lines = [l for l in gene_blob.strip().splitlines() if l]
+        lines = [line for line in gene_blob.strip().splitlines() if line]
         assert "" not in lines
 
     @patch("toolserver.tools.enrichr_pathway.httpx.Client")

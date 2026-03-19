@@ -8,9 +8,7 @@ Run with:
 from __future__ import annotations
 
 import time
-import threading
-from typing import Any, Callable, Dict, List
-from unittest.mock import MagicMock, call, patch
+from typing import Callable
 
 import pytest
 
@@ -18,7 +16,6 @@ from toolserver.executor import Executor
 from toolserver.models import RunRecord
 from toolserver.registry import ToolHandler, ToolRegistry
 from toolserver.store import RunStore
-
 
 # ===========================================================================
 # Helpers / factories
@@ -46,10 +43,16 @@ def _make_handler(
     validate_fn: Callable = None,
     tool_id: str = "test_tool",
 ) -> ToolHandler:
+    def _default_run(inputs, resources, log):
+        return {"ok": True}
+
+    def _default_validate(inputs, resources):
+        return {"ok": True, "errors": [], "warnings": []}
+
     if run_fn is None:
-        run_fn = lambda inputs, resources, log: {"ok": True}
+        run_fn = _default_run
     if validate_fn is None:
-        validate_fn = lambda inputs, resources: {"ok": True, "errors": [], "warnings": []}
+        validate_fn = _default_validate
     return ToolHandler(tool_id=tool_id, validate=validate_fn, run=run_fn)
 
 
@@ -348,7 +351,6 @@ class TestAppendLog:
             assert f"line-{i}" in log_text
 
     def test_append_log_updates_epoch(self, tmp_path, rec):
-        barrier = threading.Barrier(2)
         epoch_snapshots: list = []
 
         def run_fn(inputs, resources, log):

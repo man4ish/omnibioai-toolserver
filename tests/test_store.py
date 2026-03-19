@@ -9,16 +9,14 @@ from __future__ import annotations
 
 import json
 import threading
-import time
 from pathlib import Path
 from typing import List
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from toolserver.store import RunStore
 from toolserver.models import RunRecord
-
+from toolserver.store import RunStore
 
 # ===========================================================================
 # Helpers
