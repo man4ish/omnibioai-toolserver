@@ -52,32 +52,49 @@ def _failing_run(inputs, resources, log):
 def _make_client(monkeypatch, tmp_path, run_fn=None):
     """
     Build a (TestClient, RunStore) pair.
-    run_fn defaults to _fake_run.
-    Returns both so tests can inspect stored records directly.
-    """
-    store_dir = tmp_path / "runs"
-    monkeypatch.setenv("TOOLSERVER_RUN_STORE_DIR", str(store_dir))
 
+    create_app() hardcodes run_store_dir = "out/runs" and does not read any
+    env var, so we cannot redirect it via monkeypatch.setenv.  Instead we
+    patch toolserver_app.RunStore so that create_app() gets a real RunStore
+    pointed at tmp_path, and we capture that same instance to return here.
+    That way the test store IS the app store — no directory mismatch.
+    """
     import toolserver.tools as tools_mod
     monkeypatch.setattr(tools_mod, "_run", run_fn or _fake_run, raising=True)
+
+    captured: list[RunStore] = []
+
+    original_RunStore = RunStore
+
+    def capturing_RunStore(root_dir):
+        instance = original_RunStore(root_dir=str(tmp_path / "runs"))
+        captured.append(instance)
+        return instance
+
+    import toolserver_app
+    monkeypatch.setattr(toolserver_app, "RunStore", capturing_RunStore)
 
     from toolserver_app import create_app
     app = create_app()
     client = TestClient(app, raise_server_exceptions=False)
 
-    store = RunStore(root_dir=str(store_dir))
+    # The store create_app() is actually using
+    store = captured[0]
     return client, store
 
 
 def _wait_for_state(store: RunStore, run_id: str, state: str, timeout: float = 3.0) -> RunRecord:
+    """Poll until the record reaches `state`.  Uses try_get so it is safe to
+    call immediately after submit() before the record has been flushed."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        rec = store.get(run_id)
-        if rec.state == state:
+        rec = store.try_get(run_id)
+        if rec is not None and rec.state == state:
             return rec
         time.sleep(0.02)
-    rec = store.get(run_id)
-    raise TimeoutError(f"{run_id} stuck in {rec.state!r}, expected {state!r}")
+    rec = store.try_get(run_id)
+    actual = rec.state if rec else "NOT_FOUND"
+    raise TimeoutError(f"{run_id} stuck in {actual!r}, expected {state!r}")
 
 
 VALID_INPUTS = {"genes": ["TP53", "BRCA1"]}
