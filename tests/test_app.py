@@ -1,0 +1,489 @@
+"""
+Unit tests for toolserver_app endpoints.
+
+Follows the same fixture pattern as conftest.py:
+  - TOOLSERVER_RUN_STORE_DIR monkeypatched to tmp_path
+  - toolserver.tools._run monkeypatched to avoid real HTTP calls
+  - TestClient wraps create_app()
+
+Run with:
+    python -m pytest tests/test_app.py -v
+"""
+
+from __future__ import annotations
+
+import time
+from typing import Any, Dict
+
+import pytest
+from fastapi.testclient import TestClient
+
+from toolserver.models import RunRecord
+from toolserver.store import RunStore
+
+
+# ===========================================================================
+# Shared fake run / helpers
+# ===========================================================================
+
+FAKE_RESULTS = {
+    "ok": True,
+    "results": {
+        "WikiPathways_2024_Human": {
+            "library": "WikiPathways_2024_Human",
+            "columns": ["rank", "term", "p_value"],
+            "items": [{"rank": 1, "term": "DummyPathway", "p_value": 1e-6}],
+            "n_terms": 1,
+        }
+    },
+}
+
+
+def _fake_run(inputs, resources, log):
+    log("FAKE RUN called")
+    time.sleep(0.01)
+    return FAKE_RESULTS
+
+
+def _failing_run(inputs, resources, log):
+    raise RuntimeError("deliberate failure")
+
+
+def _make_client(monkeypatch, tmp_path, run_fn=None):
+    """
+    Build a (TestClient, RunStore) pair.
+    run_fn defaults to _fake_run.
+    Returns both so tests can inspect stored records directly.
+    """
+    store_dir = tmp_path / "runs"
+    monkeypatch.setenv("TOOLSERVER_RUN_STORE_DIR", str(store_dir))
+
+    import toolserver.tools as tools_mod
+    monkeypatch.setattr(tools_mod, "_run", run_fn or _fake_run, raising=True)
+
+    from toolserver_app import create_app
+    app = create_app()
+    client = TestClient(app, raise_server_exceptions=False)
+
+    store = RunStore(root_dir=str(store_dir))
+    return client, store
+
+
+def _wait_for_state(store: RunStore, run_id: str, state: str, timeout: float = 3.0) -> RunRecord:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        rec = store.get(run_id)
+        if rec.state == state:
+            return rec
+        time.sleep(0.02)
+    rec = store.get(run_id)
+    raise TimeoutError(f"{run_id} stuck in {rec.state!r}, expected {state!r}")
+
+
+VALID_INPUTS = {"genes": ["TP53", "BRCA1"]}
+VALID_BODY = {"tool_id": "enrichr_pathway", "inputs": VALID_INPUTS, "resources": {}}
+
+
+# ===========================================================================
+# Fixtures
+# ===========================================================================
+
+@pytest.fixture()
+def client(monkeypatch, tmp_path):
+    c, _ = _make_client(monkeypatch, tmp_path)
+    return c
+
+
+@pytest.fixture()
+def ctx(monkeypatch, tmp_path):
+    """Returns (client, store) for tests that need to inspect stored state."""
+    return _make_client(monkeypatch, tmp_path)
+
+
+# ===========================================================================
+# GET /health
+# ===========================================================================
+
+class TestHealth:
+
+    def test_200(self, client):
+        assert client.get("/health").status_code == 200
+
+    def test_ok_true(self, client):
+        assert client.get("/health").json()["ok"] is True
+
+    def test_service_key_present(self, client):
+        assert "service" in client.get("/health").json()
+
+
+# ===========================================================================
+# GET /capabilities
+# ===========================================================================
+
+class TestCapabilities:
+
+    def test_200(self, client):
+        assert client.get("/capabilities").status_code == 200
+
+    def test_engines_present(self, client):
+        assert "engines" in client.get("/capabilities").json()
+
+    def test_tools_present(self, client):
+        assert "tools" in client.get("/capabilities").json()
+
+    def test_enrichr_pathway_listed(self, client):
+        tool_ids = [t["tool_id"] for t in client.get("/capabilities").json()["tools"]]
+        assert "enrichr_pathway" in tool_ids
+
+    def test_enrichr_pathway_version_v1(self, client):
+        tools = client.get("/capabilities").json()["tools"]
+        tool = next(t for t in tools if t["tool_id"] == "enrichr_pathway")
+        assert tool["version"] == "v1"
+
+    def test_enrichr_pathway_has_libraries_default_feature(self, client):
+        tools = client.get("/capabilities").json()["tools"]
+        tool = next(t for t in tools if t["tool_id"] == "enrichr_pathway")
+        assert "libraries_default" in tool["features"]
+
+
+# ===========================================================================
+# POST /validate
+# ===========================================================================
+
+class TestValidate:
+
+    def test_valid_inputs_ok_true(self, client):
+        resp = client.post("/validate", json={
+            "tool_id": "enrichr_pathway",
+            "inputs": VALID_INPUTS,
+            "resources": {},
+        })
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+
+    def test_unknown_tool_ok_false(self, client):
+        resp = client.post("/validate", json={"tool_id": "ghost", "inputs": {}, "resources": {}})
+        assert resp.json()["ok"] is False
+
+    def test_unknown_tool_error_code(self, client):
+        errors = client.post("/validate", json={"tool_id": "ghost", "inputs": {}, "resources": {}}).json()["errors"]
+        assert any(e["code"] == "UNKNOWN_TOOL" for e in errors)
+
+    def test_empty_genes_list_ok_false(self, client):
+        resp = client.post("/validate", json={
+            "tool_id": "enrichr_pathway",
+            "inputs": {"genes": []},
+            "resources": {},
+        })
+        assert resp.json()["ok"] is False
+
+    def test_empty_genes_list_errors_non_empty(self, client):
+        resp = client.post("/validate", json={
+            "tool_id": "enrichr_pathway",
+            "inputs": {"genes": []},
+            "resources": {},
+        })
+        assert len(resp.json()["errors"]) > 0
+
+    def test_empty_genes_error_references_genes_field(self, client):
+        resp = client.post("/validate", json={
+            "tool_id": "enrichr_pathway",
+            "inputs": {"genes": []},
+            "resources": {},
+        })
+        fields = [e.get("field") for e in resp.json()["errors"]]
+        assert "genes" in fields
+
+    def test_missing_genes_key_ok_false(self, client):
+        resp = client.post("/validate", json={
+            "tool_id": "enrichr_pathway",
+            "inputs": {},
+            "resources": {},
+        })
+        assert resp.json()["ok"] is False
+
+    def test_genes_non_list_ok_false(self, client):
+        resp = client.post("/validate", json={
+            "tool_id": "enrichr_pathway",
+            "inputs": {"genes": "TP53"},
+            "resources": {},
+        })
+        assert resp.json()["ok"] is False
+
+    def test_warnings_key_always_present(self, client):
+        resp = client.post("/validate", json={
+            "tool_id": "enrichr_pathway",
+            "inputs": VALID_INPUTS,
+            "resources": {},
+        })
+        assert "warnings" in resp.json()
+
+    def test_missing_tool_id_returns_422(self, client):
+        assert client.post("/validate", json={"inputs": VALID_INPUTS}).status_code == 422
+
+    def test_omitting_inputs_does_not_422(self, client):
+        # inputs has default_factory=dict, so omitting is legal at the HTTP layer
+        resp = client.post("/validate", json={"tool_id": "enrichr_pathway"})
+        assert resp.status_code == 200
+
+
+# ===========================================================================
+# POST /runs
+# ===========================================================================
+
+class TestCreateRun:
+
+    def test_returns_run_id(self, client):
+        assert "run_id" in client.post("/runs", json=VALID_BODY).json()
+
+    def test_run_id_has_ts_prefix(self, client):
+        assert client.post("/runs", json=VALID_BODY).json()["run_id"].startswith("ts_")
+
+    def test_run_ids_are_unique(self, client):
+        ids = {client.post("/runs", json=VALID_BODY).json()["run_id"] for _ in range(10)}
+        assert len(ids) == 10
+
+    def test_empty_genes_returns_400(self, client):
+        resp = client.post("/runs", json={
+            "tool_id": "enrichr_pathway",
+            "inputs": {"genes": []},
+            "resources": {},
+        })
+        assert resp.status_code == 400
+
+    def test_empty_genes_error_code_validation_failed(self, client):
+        resp = client.post("/runs", json={
+            "tool_id": "enrichr_pathway",
+            "inputs": {"genes": []},
+            "resources": {},
+        })
+        assert resp.json()["error"]["code"] == "VALIDATION_FAILED"
+
+    def test_unknown_tool_returns_400(self, client):
+        assert client.post("/runs", json={"tool_id": "ghost", "inputs": {}, "resources": {}}).status_code == 400
+
+    def test_missing_tool_id_returns_422(self, client):
+        assert client.post("/runs", json={"inputs": VALID_INPUTS}).status_code == 422
+
+    def test_record_created_in_store(self, ctx):
+        client, store = ctx
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        assert store.try_get(run_id) is not None
+
+    def test_record_tool_id_is_enrichr_pathway(self, ctx):
+        client, store = ctx
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        assert store.get(run_id).tool_id == "enrichr_pathway"
+
+    def test_record_has_queued_log(self, ctx):
+        client, store = ctx
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        assert any("Queued" in line for line in store.get(run_id).logs)
+
+    def test_resources_stored_on_record(self, ctx):
+        client, store = ctx
+        resources = {"cpu": 4}
+        run_id = client.post("/runs", json={**VALID_BODY, "resources": resources}).json()["run_id"]
+        assert store.get(run_id).resources == resources
+
+    def test_inputs_stored_as_lightweight_placeholder(self, ctx):
+        client, store = ctx
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        assert store.get(run_id).inputs == {"summary": "stored externally"}
+
+    def test_run_eventually_completes(self, ctx):
+        client, store = ctx
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        _wait_for_state(store, run_id, "COMPLETED")
+
+    def test_failing_run_reaches_failed_state(self, monkeypatch, tmp_path):
+        client, store = _make_client(monkeypatch, tmp_path, run_fn=_failing_run)
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        _wait_for_state(store, run_id, "FAILED")
+
+    def test_status_200_on_success(self, client):
+        assert client.post("/runs", json=VALID_BODY).status_code == 200
+
+
+# ===========================================================================
+# GET /runs/{run_id}
+# ===========================================================================
+
+class TestGetRun:
+
+    def test_200_for_known_run(self, client):
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        assert client.get(f"/runs/{run_id}").status_code == 200
+
+    def test_run_id_echoed(self, client):
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        assert client.get(f"/runs/{run_id}").json()["run_id"] == run_id
+
+    def test_state_is_valid_run_state(self, client):
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        state = client.get(f"/runs/{run_id}").json()["state"]
+        assert state in ("QUEUED", "RUNNING", "COMPLETED", "FAILED")
+
+    def test_updated_epoch_present(self, client):
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        assert "updated_epoch" in client.get(f"/runs/{run_id}").json()
+
+    def test_unknown_run_id_state_is_failed(self, client):
+        assert client.get("/runs/ghost-run-999").json()["state"] == "FAILED"
+
+    def test_unknown_run_id_has_message(self, client):
+        assert "message" in client.get("/runs/ghost-run-999").json()
+
+    def test_state_completed_after_execution(self, ctx):
+        client, store = ctx
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        _wait_for_state(store, run_id, "COMPLETED")
+        assert client.get(f"/runs/{run_id}").json()["state"] == "COMPLETED"
+
+    def test_state_failed_after_execution_error(self, monkeypatch, tmp_path):
+        client, store = _make_client(monkeypatch, tmp_path, run_fn=_failing_run)
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        _wait_for_state(store, run_id, "FAILED")
+        assert client.get(f"/runs/{run_id}").json()["state"] == "FAILED"
+
+
+# ===========================================================================
+# GET /runs/{run_id}/logs
+# ===========================================================================
+
+class TestGetLogs:
+
+    def test_200_for_known_run(self, client):
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        assert client.get(f"/runs/{run_id}/logs").status_code == 200
+
+    def test_run_id_echoed(self, client):
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        assert client.get(f"/runs/{run_id}/logs").json()["run_id"] == run_id
+
+    def test_logs_field_is_string(self, client):
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        assert isinstance(client.get(f"/runs/{run_id}/logs").json()["logs"], str)
+
+    def test_unknown_run_contains_unknown_run_message(self, client):
+        assert "unknown run" in client.get("/runs/ghost-999/logs").json()["logs"]
+
+    def test_fake_run_log_line_appears_after_completion(self, ctx):
+        client, store = ctx
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        _wait_for_state(store, run_id, "COMPLETED")
+        logs = client.get(f"/runs/{run_id}/logs").json()["logs"]
+        assert "FAKE RUN called" in logs
+
+    def test_tail_limits_line_count(self, ctx):
+        client, store = ctx
+        rec = RunRecord(
+            run_id="log-many", tool_id="enrichr_pathway", state="COMPLETED",
+            created_epoch=1_700_000_000, updated_epoch=1_700_000_001,
+            inputs={}, resources={}, logs=[f"line-{i}" for i in range(50)],
+            results={"ok": True}, error=None,
+        )
+        store.create(rec)
+        data = client.get("/runs/log-many/logs?tail=5").json()
+        assert len(data["logs"].strip().splitlines()) == 5
+
+    def test_tail_returns_last_lines(self, ctx):
+        client, store = ctx
+        rec = RunRecord(
+            run_id="log-tail", tool_id="enrichr_pathway", state="COMPLETED",
+            created_epoch=1_700_000_000, updated_epoch=1_700_000_001,
+            inputs={}, resources={}, logs=[f"line-{i}" for i in range(10)],
+            results={"ok": True}, error=None,
+        )
+        store.create(rec)
+        data = client.get("/runs/log-tail/logs?tail=3").json()
+        assert "line-9" in data["logs"]
+        assert "line-0" not in data["logs"]
+
+    def test_default_tail_is_200_lines(self, ctx):
+        client, store = ctx
+        rec = RunRecord(
+            run_id="log-default", tool_id="enrichr_pathway", state="COMPLETED",
+            created_epoch=1_700_000_000, updated_epoch=1_700_000_001,
+            inputs={}, resources={}, logs=[f"line-{i}" for i in range(300)],
+            results={"ok": True}, error=None,
+        )
+        store.create(rec)
+        data = client.get("/runs/log-default/logs").json()
+        assert len(data["logs"].strip().splitlines()) == 200
+
+
+# ===========================================================================
+# GET /runs/{run_id}/results
+# ===========================================================================
+
+class TestGetResults:
+
+    def _inject(self, store: RunStore, run_id: str, state: str,
+                results=None, error=None) -> None:
+        store.create(RunRecord(
+            run_id=run_id, tool_id="enrichr_pathway", state=state,
+            created_epoch=1_700_000_000, updated_epoch=1_700_000_001,
+            inputs={}, resources={}, logs=[], results=results, error=error,
+        ))
+
+    def test_unknown_run_not_found_code(self, client):
+        data = client.get("/runs/ghost-999/results").json()
+        assert data["ok"] is False
+        assert data["error"]["code"] == "NOT_FOUND"
+
+    def test_queued_run_not_ready_code(self, ctx):
+        client, store = ctx
+        self._inject(store, "q-run", "QUEUED")
+        data = client.get("/runs/q-run/results").json()
+        assert data["ok"] is False
+        assert data["error"]["code"] == "NOT_READY"
+
+    def test_running_run_not_ready_code(self, ctx):
+        client, store = ctx
+        self._inject(store, "r-run", "RUNNING")
+        data = client.get("/runs/r-run/results").json()
+        assert data["ok"] is False
+        assert data["error"]["code"] == "NOT_READY"
+
+    def test_not_ready_echoes_state(self, ctx):
+        client, store = ctx
+        self._inject(store, "s-run", "RUNNING")
+        assert client.get("/runs/s-run/results").json()["state"] == "RUNNING"
+
+    def test_failed_run_not_ready(self, ctx):
+        client, store = ctx
+        self._inject(store, "f-run", "FAILED",
+                     error={"code": "EXEC_FAILED", "message": "oops", "trace": ""})
+        assert client.get("/runs/f-run/results").json()["ok"] is False
+
+    def test_completed_returns_stored_results(self, ctx):
+        client, store = ctx
+        expected = {"score": 99, "label": "hit"}
+        self._inject(store, "done-run", "COMPLETED", results=expected)
+        assert client.get("/runs/done-run/results").json() == expected
+
+    def test_completed_none_results_returns_default_ok(self, ctx):
+        client, store = ctx
+        self._inject(store, "done-empty", "COMPLETED", results=None)
+        assert client.get("/runs/done-empty/results").json()["ok"] is True
+
+    def test_e2e_results_ok_true(self, ctx):
+        client, store = ctx
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        _wait_for_state(store, run_id, "COMPLETED")
+        assert client.get(f"/runs/{run_id}/results").json()["ok"] is True
+
+    def test_e2e_results_contain_wikipathways_key(self, ctx):
+        client, store = ctx
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        _wait_for_state(store, run_id, "COMPLETED")
+        data = client.get(f"/runs/{run_id}/results").json()
+        assert "WikiPathways_2024_Human" in data.get("results", {})
+
+    def test_e2e_failed_run_results_not_ready(self, monkeypatch, tmp_path):
+        client, store = _make_client(monkeypatch, tmp_path, run_fn=_failing_run)
+        run_id = client.post("/runs", json=VALID_BODY).json()["run_id"]
+        _wait_for_state(store, run_id, "FAILED")
+        data = client.get(f"/runs/{run_id}/results").json()
+        assert data["ok"] is False
