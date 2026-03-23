@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import secrets
 import time
 
@@ -7,10 +8,10 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from toolserver.executor import Executor
-from toolserver.models import RunCreateRequest, ValidateRequest
+from toolserver.models import RunCreateRequest, RunRecord, ValidateRequest
 from toolserver.registry import ToolRegistry
 from toolserver.store import RunStore
-from toolserver.tools import register_tools
+from toolserver.tools import load_tools_from_yaml, register_tools
 
 
 def _new_run_id() -> str:
@@ -18,14 +19,22 @@ def _new_run_id() -> str:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="toolserver_template")
+    app = FastAPI(title="omnibioai-toolserver")
 
-    # Config knobs (hardcoded for now; env vars later)
     run_store_dir = "out/runs"
     store = RunStore(run_store_dir)
 
     registry = ToolRegistry()
+
+    # 1) Register legacy enrichr_pathway handler (keeps existing behaviour)
     register_tools(registry)
+
+    # 2) Auto-register all YAML-declared HTTP tools (zero Python per tool)
+    tools_yaml = os.environ.get("TOOLS_YAML_PATH", "configs/tools.example.yaml")
+    if os.path.exists(tools_yaml):
+        load_tools_from_yaml(registry, tools_yaml)
+    else:
+        print(f"[toolserver] WARNING: tools YAML not found at '{tools_yaml}' — only legacy tools loaded")
 
     executor = Executor(store=store, registry=registry, max_workers=8)
 
@@ -52,7 +61,7 @@ def create_app() -> FastAPI:
     # ----------------
     @app.post("/runs")
     def create_run(req: RunCreateRequest):
-        # 1) validate
+        # 1) validate first
         v = validate(ValidateRequest(tool_id=req.tool_id, inputs=req.inputs, resources=req.resources))
         if not v.get("ok", False):
             return JSONResponse(
@@ -63,26 +72,23 @@ def create_app() -> FastAPI:
         run_id = _new_run_id()
         now = int(time.time())
 
-        # Store only lightweight inputs metadata in record
-        rec = {
-            "run_id": run_id,
-            "tool_id": req.tool_id,
-            "state": "QUEUED",
-            "created_epoch": now,
-            "updated_epoch": now,
-            "inputs": {"summary": "stored externally"},  # keep record small
-            "resources": req.resources,
-            "logs": ["Queued"],
-            "results": None,
-            "error": None,
-        }
-        from toolserver.models import RunRecord
-        store.create(RunRecord(**rec))
+        rec = RunRecord(
+            run_id=run_id,
+            tool_id=req.tool_id,
+            state="QUEUED",
+            created_epoch=now,
+            updated_epoch=now,
+            inputs={"summary": "stored externally"},  # keep record lightweight
+            resources=req.resources,
+            logs=["Queued"],
+            results=None,
+            error=None,
+        )
+        store.create(rec)
 
-        # 2) async execution (full inputs passed to executor)
+        # 2) async execution — full inputs passed directly to executor
         executor.submit(store.get(run_id), full_inputs=req.inputs, resources=req.resources)
 
-        # HttpToolServerAdapter expects JSON with "run_id"
         return {"run_id": run_id}
 
     # ----------------
@@ -118,14 +124,17 @@ def create_app() -> FastAPI:
             return {"ok": False, "error": {"code": "NOT_FOUND", "message": "unknown run"}}
         if rec.state != "COMPLETED":
             return {
-                "ok": False, 
+                "ok": False,
                 "error": {"code": "NOT_READY", "message": f"state={rec.state}"},
                 "state": rec.state,
             }
         return rec.results or {"ok": True, "results": {}}
 
+    # ----------------
+    # Health
+    # ----------------
     @app.get("/health")
     def health():
-        return {"ok": True, "service": "toolserver_template"}
+        return {"ok": True, "service": "omnibioai-toolserver"}
 
     return app
