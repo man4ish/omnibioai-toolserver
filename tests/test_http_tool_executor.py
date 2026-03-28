@@ -258,7 +258,7 @@ class TestMakeRunGet:
         with patch("httpx.Client.get", return_value=mock_resp) as mock_get:
             run({"query": "MYC"}, {}, log)   # limit not provided → default 10
             _, kwargs = mock_get.call_args
-            assert kwargs["params"]["limit"] == "10"
+            assert kwargs["params"]["limit"] == 10
 
     def test_log_called_twice(self, run, log):
         with self._patch_get({"results": [], "metadata": {}}):
