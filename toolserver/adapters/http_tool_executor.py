@@ -50,6 +50,20 @@ def _response_map(tool_def: Dict) -> Dict:
     return rmap if isinstance(rmap, dict) else {}
 
 
+def _parse_response(resp: httpx.Response) -> Any:
+    """
+    Parse response — tries JSON first, falls back to plain text.
+    Handles APIs like KEGG that return text/plain instead of JSON.
+    """
+    content_type = resp.headers.get("content-type", "")
+    if "application/json" in content_type:
+        return resp.json()
+    try:
+        return resp.json()
+    except Exception:
+        return {"text": resp.text}
+
+
 def make_validate(tool_def: Dict) -> Callable:
     """Return a validate() function bound to this tool_def."""
 
@@ -113,7 +127,6 @@ def make_run(tool_def: Dict) -> Callable:
         params: Dict[str, Any] = {}
         for k, v in raw_params.items():
             resolved_v = _resolve(str(v), resolved)
-            # Restore integer type if original value was an integer placeholder
             field_def = next((f for f in _input_fields(tool_def) if f["name"] == k), None)
             if field_def and field_def.get("type") == "integer":
                 try:
@@ -158,7 +171,9 @@ def make_run(tool_def: Dict) -> Callable:
                 raise ValueError(f"Unsupported HTTP method: {method}")
 
         resp.raise_for_status()
-        raw = resp.json()
+
+        # ✅ Handle both JSON and plain text responses (e.g. KEGG returns text/plain)
+        raw = _parse_response(resp)
 
         # Map response fields via dot-path notation
         result: Dict[str, Any] = {"raw": raw}
