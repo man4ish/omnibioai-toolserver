@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, List
 
 import httpx
 
@@ -38,13 +38,25 @@ def _get_nested(data: Any, path: str) -> Any:
     return data
 
 
+def _input_fields(tool_def: Dict) -> List[Dict]:
+    """Safely get inputs list — handles None and missing key."""
+    fields = tool_def.get("inputs") or []
+    return fields if isinstance(fields, list) else []
+
+
+def _response_map(tool_def: Dict) -> Dict:
+    """Safely get response_map — handles None and missing key."""
+    rmap = tool_def.get("response_map") or {}
+    return rmap if isinstance(rmap, dict) else {}
+
+
 def make_validate(tool_def: Dict) -> Callable:
     """Return a validate() function bound to this tool_def."""
 
     def _validate(inputs: Dict[str, Any], resources: Dict[str, Any]) -> Dict[str, Any]:
         errors = []
 
-        for field in tool_def.get("inputs", []):
+        for field in _input_fields(tool_def):
             name     = field["name"]
             required = field.get("required", False)
             ftype    = field.get("type", "string")
@@ -73,44 +85,66 @@ def make_run(tool_def: Dict) -> Callable:
         resources: Dict[str, Any],
         log: Callable[[str], None],
     ) -> Dict[str, Any]:
-        http_cfg  = tool_def["http"]
-        method    = http_cfg.get("method", "GET").upper()
-        timeout   = http_cfg.get("timeout", 15)
+        http_cfg = tool_def.get("http")
+        if not http_cfg or not isinstance(http_cfg, dict):
+            raise ValueError(
+                f"[{tool_def.get('tool_id', '?')}] tool_def missing 'http' block"
+            )
+
+        method  = http_cfg.get("method", "GET").upper()
+        timeout = http_cfg.get("timeout", 15)
+
+        if "url" not in http_cfg:
+            raise ValueError(
+                f"[{tool_def.get('tool_id', '?')}] tool_def.http missing 'url'"
+            )
 
         # Apply input defaults
         resolved: Dict[str, Any] = {}
-        for field in tool_def.get("inputs", []):
+        for field in _input_fields(tool_def):
             name = field["name"]
             resolved[name] = inputs.get(name, field.get("default", ""))
 
         # Build URL — resolve {path_param} placeholders
         url = _resolve(http_cfg["url"], resolved)
 
-        # Build query params — resolve placeholders in values
-        params = {
-            k: _resolve(str(v), resolved)
-            for k, v in http_cfg.get("params", {}).items()
-        }
+        # Build query params — preserve native types (int stays int for httpx)
+        raw_params = http_cfg.get("params") or {}
+        params: Dict[str, Any] = {}
+        for k, v in raw_params.items():
+            resolved_v = _resolve(str(v), resolved)
+            # Restore integer type if original value was an integer placeholder
+            field_def = next((f for f in _input_fields(tool_def) if f["name"] == k), None)
+            if field_def and field_def.get("type") == "integer":
+                try:
+                    params[k] = int(resolved_v)
+                except ValueError:
+                    params[k] = resolved_v
+            else:
+                params[k] = resolved_v
+
+        # Skip empty string params — avoids ?synonym= polluting URLs
+        params = {k: v for k, v in params.items() if v != ""}
 
         # Headers
-        headers = dict(http_cfg.get("headers", {}))
+        headers = dict(http_cfg.get("headers") or {})
 
         # Body (POST only)
         body_type = http_cfg.get("body_type", "json")
-        body_map  = {
+        body_map: Dict[str, Any] = {
             k: _resolve(str(v), resolved)
-            for k, v in http_cfg.get("body_map", {}).items()
+            for k, v in (http_cfg.get("body_map") or {}).items()
         }
 
         # Log — mask secret fields
         secret_fields = {
-            f["name"] for f in tool_def.get("inputs", []) if f.get("secret")
+            f["name"] for f in _input_fields(tool_def) if f.get("secret")
         }
         safe_inputs = {
             k: ("***" if k in secret_fields else v)
             for k, v in resolved.items()
         }
-        log(f"[{tool_def['tool_id']}] {method} {url} inputs={safe_inputs}")
+        log(f"[{tool_def.get('tool_id', '?')}] {method} {url} inputs={safe_inputs}")
 
         # Execute
         with httpx.Client(timeout=timeout) as client:
@@ -128,10 +162,10 @@ def make_run(tool_def: Dict) -> Callable:
 
         # Map response fields via dot-path notation
         result: Dict[str, Any] = {"raw": raw}
-        for out_key, json_path in tool_def.get("response_map", {}).items():
-            result[out_key] = _get_nested(raw, str(json_path))
+        for out_key, json_path in _response_map(tool_def).items():
+            result[out_key] = _get_nested(raw, str(json_path) if json_path else "")
 
-        log(f"[{tool_def['tool_id']}] completed OK")
+        log(f"[{tool_def.get('tool_id', '?')}] completed OK")
         return result
 
     return _run

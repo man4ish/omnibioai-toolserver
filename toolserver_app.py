@@ -3,15 +3,22 @@ from __future__ import annotations
 import os
 import secrets
 import time
+from typing import Any, Dict, List
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
+from toolserver.adapters.http_tool_executor import make_run, make_validate
 from toolserver.executor import Executor
 from toolserver.models import RunCreateRequest, RunRecord, ValidateRequest
-from toolserver.registry import ToolRegistry
+from toolserver.registry import ToolHandler, ToolRegistry
 from toolserver.store import RunStore
 from toolserver.tools import load_tools_from_yaml, register_tools
+
+
+class RegisterToolsRequest(BaseModel):
+    tools: List[Dict[str, Any]]
 
 
 def _new_run_id() -> str:
@@ -129,6 +136,42 @@ def create_app() -> FastAPI:
                 "state": rec.state,
             }
         return rec.results or {"ok": True, "results": {}}
+
+    # ----------------
+    # Register tools (dynamic, zero-config)
+    # ----------------
+    @app.post("/register_tools")
+    def register_tools_endpoint(req: RegisterToolsRequest):
+        registered = 0
+        for tool_def in req.tools:
+            tool_id = tool_def.get("tool_id")
+            if not tool_id:
+                continue
+            if tool_def.get("http"):
+                handler = ToolHandler(
+                    tool_id=tool_id,
+                    validate=make_validate(tool_def),
+                    run=make_run(tool_def),
+                    version=tool_def.get("version", "v1"),
+                    features=tool_def.get("features") or {},
+                )
+            else:
+                def _stub_validate(inputs, resources):
+                    return {"ok": True, "errors": [], "warnings": []}
+
+                def _stub_run(inputs, resources, log, _tid=tool_id):
+                    raise NotImplementedError(f"Tool {_tid!r} has no http block; cannot execute")
+
+                handler = ToolHandler(
+                    tool_id=tool_id,
+                    validate=_stub_validate,
+                    run=_stub_run,
+                    version=tool_def.get("version", "v1"),
+                    features=tool_def.get("features") or {},
+                )
+            registry.register(handler)
+            registered += 1
+        return {"ok": True, "registered": registered}
 
     # ----------------
     # Health
