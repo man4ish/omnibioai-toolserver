@@ -10,6 +10,7 @@ import yaml
 from ..adapters.http_tool_executor import make_run, make_validate
 from ..registry import ToolHandler
 from .enrichr_pathway import _run, _validate
+from .david_annotation import _run as _david_run, _validate as _david_validate
 
 
 def register_tools(registry) -> None:
@@ -21,6 +22,16 @@ def register_tools(registry) -> None:
             run=_run,
             version="v1",
             features={"libraries_default": ["WikiPathways_2024_Human", "Reactome_2022"]},
+        )
+    )
+    # DAVID annotation tool
+    registry.register(
+        ToolHandler(
+            tool_id="david_annotation",
+            validate=_david_validate,
+            run=_david_run,
+            version="v1",
+            features={"email_required": True},
         )
     )
 
