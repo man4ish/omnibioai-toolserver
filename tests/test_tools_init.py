@@ -37,9 +37,21 @@ class TestRegisterTools:
         registry = _make_registry()
         register_tools(registry)
 
-        registry.register.assert_called_once()
-        handler = registry.registered[0]
-        assert handler.tool_id == "enrichr_pathway"
+        ids = [h.tool_id for h in registry.registered]
+        assert "enrichr_pathway" in ids
+
+    def test_registers_david_annotation(self):
+        registry = _make_registry()
+        register_tools(registry)
+
+        ids = [h.tool_id for h in registry.registered]
+        assert "david_annotation" in ids
+
+    def test_registers_both_builtin_tools(self):
+        registry = _make_registry()
+        register_tools(registry)
+
+        assert registry.register.call_count == 2
 
     def test_enrichr_pathway_has_correct_version(self):
         registry = _make_registry()

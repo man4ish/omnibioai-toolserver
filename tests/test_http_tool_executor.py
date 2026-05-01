@@ -8,7 +8,7 @@ from typing import Any, Dict
 # ── Import the module under test ──────────────────────────────────────────────
 # Adjust the import path to match your project structure, e.g.:
 # from toolserver.tool_runner import _resolve, _get_nested, make_validate, make_run
-from toolserver.adapters.http_tool_executor import _resolve, _get_nested, make_validate, make_run
+from toolserver.adapters.http_tool_executor import _resolve, _get_nested, _parse_response, make_validate, make_run
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -404,3 +404,88 @@ class TestMakeRunDefaultMethod:
         with patch("httpx.Client.get", return_value=mock_resp) as mock_get:
             run({"query": "X"}, {}, MagicMock())
             assert mock_get.called
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# _parse_response  (lines 59-64)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TestParseResponse:
+    def test_json_content_type_returns_parsed_json(self):
+        """Line 60: content-type is application/json → early return via resp.json()."""
+        mock_resp = MagicMock()
+        mock_resp.headers = {"content-type": "application/json; charset=utf-8"}
+        mock_resp.json.return_value = {"key": "value"}
+        assert _parse_response(mock_resp) == {"key": "value"}
+
+    def test_non_json_content_type_falls_back_to_json(self):
+        """Line 62: content-type is not application/json but json() still succeeds."""
+        mock_resp = MagicMock()
+        mock_resp.headers = {"content-type": "text/plain"}
+        mock_resp.json.return_value = {"data": 42}
+        assert _parse_response(mock_resp) == {"data": 42}
+
+    def test_json_parse_failure_returns_text(self):
+        """Lines 63-64: json() raises → fall back to {'text': resp.text}."""
+        mock_resp = MagicMock()
+        mock_resp.headers = {"content-type": "text/plain"}
+        mock_resp.json.side_effect = Exception("not valid JSON")
+        mock_resp.text = "gene\tname\nTP53\ttumour protein"
+        result = _parse_response(mock_resp)
+        assert result == {"text": "gene\tname\nTP53\ttumour protein"}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# make_run — config-error guard-clauses (lines 103-114)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TestMakeRunConfigErrors:
+    def test_raises_when_http_block_absent(self):
+        """Line 104: tool_def has no 'http' key → ValueError."""
+        run = make_run({"tool_id": "no_http"})
+        with pytest.raises(ValueError, match="missing 'http' block"):
+            run({}, {}, MagicMock())
+
+    def test_raises_when_http_block_is_none(self):
+        """Line 104: tool_def['http'] = None → ValueError."""
+        run = make_run({"tool_id": "null_http", "http": None})
+        with pytest.raises(ValueError, match="missing 'http' block"):
+            run({}, {}, MagicMock())
+
+    def test_raises_when_http_block_not_a_dict(self):
+        """Line 104: tool_def['http'] is a non-dict truthy value → ValueError."""
+        run = make_run({"tool_id": "bad_http", "http": "GET /genes"})
+        with pytest.raises(ValueError, match="missing 'http' block"):
+            run({}, {}, MagicMock())
+
+    def test_raises_when_url_missing_from_http_block(self):
+        """Line 112: http block exists but has no 'url' key → ValueError."""
+        run = make_run({"tool_id": "no_url", "http": {"method": "GET"}})
+        with pytest.raises(ValueError, match="missing 'url'"):
+            run({}, {}, MagicMock())
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# make_run — integer param conversion failure (lines 132-135)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TestMakeRunIntegerParamFallback:
+    def test_non_numeric_integer_param_kept_as_string(self):
+        """Lines 134-135: int() conversion fails → param value kept as string."""
+        tool_def = {
+            "tool_id": "int_test",
+            "inputs": [{"name": "count", "type": "integer", "required": False, "default": ""}],
+            "http": {
+                "method": "GET",
+                "url": "https://api.example.com/data",
+                "params": {"count": "{count}"},
+            },
+            "response_map": {},
+        }
+        run = make_run(tool_def)
+        mock_resp = _make_mock_response({})
+
+        with patch("httpx.Client.get", return_value=mock_resp) as mock_get:
+            run({"count": "not-a-number"}, {}, MagicMock())
+            _, kwargs = mock_get.call_args
+            assert kwargs["params"]["count"] == "not-a-number"
