@@ -25,12 +25,35 @@ dev = [
 ]
 
 [tool.setuptools]
-# You have a flat repo layout: toolserver/ is the package
 packages = ["toolserver"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = [
+  "-q",
+  "--cov=toolserver",
+  "--cov-report=term-missing",
+  "--cov-fail-under=95",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["toolserver"]
+omit = [
+  "*/tests/*",
+  "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+skip_covered = false
+exclude_lines = [
+  "pragma: no cover",
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+  "if TYPE_CHECKING:",
+]
 
 [tool.ruff]
 line-length = 110

@@ -433,6 +433,19 @@ class TestGetLogs:
         data = client.get("/runs/log-default/logs").json()
         assert len(data["logs"].strip().splitlines()) == 200
 
+    def test_tail_zero_returns_all_lines(self, ctx):
+        """Line 120→122: tail=0 is falsy → if branch skipped → all lines returned."""
+        client, store = ctx
+        rec = RunRecord(
+            run_id="log-tail-zero", tool_id="enrichr_pathway", state="COMPLETED",
+            created_epoch=1_700_000_000, updated_epoch=1_700_000_001,
+            inputs={}, resources={}, logs=[f"line-{i}" for i in range(5)],
+            results={"ok": True}, error=None,
+        )
+        store.create(rec)
+        data = client.get("/runs/log-tail-zero/logs?tail=0").json()
+        assert len(data["logs"].strip().splitlines()) == 5
+
 
 # ===========================================================================
 # GET /runs/{run_id}/results
@@ -508,3 +521,30 @@ class TestGetResults:
         _wait_for_state(store, run_id, "FAILED")
         data = client.get(f"/runs/{run_id}/results").json()
         assert data["ok"] is False
+
+
+# ===========================================================================
+# /register_tools → stub run execution (line 160)
+# ===========================================================================
+
+class TestStubRunExecution:
+
+    def test_stub_run_raises_not_implemented_reaches_failed(self, ctx):
+        """Line 160: _stub_run raises NotImplementedError → executor marks run FAILED."""
+        client, store = ctx
+
+        # Register a non-http tool — creates _stub_validate + _stub_run
+        reg = client.post("/register_tools", json={"tools": [{"tool_id": "stub_exec_tool"}]})
+        assert reg.json()["registered"] == 1
+
+        # Validation passes (_stub_validate always ok=True), run is submitted
+        resp = client.post("/runs", json={
+            "tool_id": "stub_exec_tool", "inputs": {}, "resources": {},
+        })
+        assert resp.status_code == 200
+        run_id = resp.json()["run_id"]
+
+        # _stub_run raises NotImplementedError → executor catches → FAILED
+        _wait_for_state(store, run_id, "FAILED")
+        error_msg = store.get(run_id).error["message"]
+        assert "has no http block" in error_msg
