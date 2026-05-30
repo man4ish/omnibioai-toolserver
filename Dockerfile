@@ -1,31 +1,22 @@
-# syntax=docker/dockerfile:1
+# omnibioai-toolserver/Dockerfile.new
+FROM python:3.12-slim-bookworm
 
-FROM python:3.13-slim
-
-# Basic OS deps (add gcc only if you have packages needing compilation)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    curl \
-  && rm -rf /var/lib/apt/lists/*
-
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+LABEL org.opencontainers.image.source=https://github.com/man4ish/omnibioai
 
 WORKDIR /app
 
-# ---- Install Python deps (cache-friendly) ----
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# ---- Copy app code ----
-COPY toolserver /app/toolserver
-COPY toolserver_app.py /app/toolserver_app.py
-# Optional: include scripts if you use them inside container
-COPY scripts /app/scripts
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY toolserver/ ./toolserver/
+COPY toolserver_app.py .
+COPY scripts/ ./scripts/
 
 EXPOSE 9090
-
-# Healthcheck endpoint exists: /health
-# (compose can healthcheck; you can also add Dockerfile HEALTHCHECK if you want)
-
 CMD ["uvicorn", "toolserver_app:create_app", "--factory", "--host", "0.0.0.0", "--port", "9090"]
