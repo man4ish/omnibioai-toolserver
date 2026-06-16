@@ -31,6 +31,9 @@ The ToolServer exposes the following endpoints:
 * `GET  /runs/{id}/results`
   Retrieve structured tool results once the run is completed.
 
+* `GET  /health`
+  Service health check — returns `{"ok": true, "service": "omnibioai-toolserver"}`
+
 This contract matches the expectations of
 **`omnibioai-tes` → `HttpToolServerAdapter`**.
 
@@ -55,28 +58,33 @@ This contract matches the expectations of
 
 ---
 
-## Running the ToolServer
+## Running
 
-### Requirements
+### Via OmniBioAI Studio (recommended)
 
-* Python ≥ 3.11
+```bash
+cd ~/Desktop/machine/omnibioai-studio
+docker compose up -d toolserver
+```
 
-### Install
+Access: `http://localhost:9090`
+Via nginx: `http://localhost/_svc/toolserver`
+
+### Standalone (development)
 
 ```bash
 pip install -r requirements.txt
-```
-
-### Run
-
-```bash
-uvicorn toolserver_app:create_app --factory --host 0.0.0.0 --port 9090
+uvicorn toolserver_app:create_app --factory \
+  --host 0.0.0.0 --port 9090 --reload
 ```
 
 ### Verify
 
 ```bash
-curl http://127.0.0.1:9090/capabilities | python -m json.tool
+curl http://localhost:9090/health
+# {"ok": true, "service": "omnibioai-toolserver"}
+
+curl http://localhost:9090/capabilities | python -m json.tool
 ```
 
 ---
@@ -141,6 +149,17 @@ No changes are required in TES beyond refreshing server capabilities.
 
 ---
 
+## Testing
+
+```bash
+cd ~/Desktop/machine/omnibioai-toolserver
+pytest tests/ -v --cov=.
+
+# 100% coverage
+```
+
+---
+
 ## Design Principles
 
 * **LLMs never execute tools directly**
@@ -154,9 +173,25 @@ No changes are required in TES beyond refreshing server capabilities.
 
 ---
 
+## Related Services
+
+| Service | Role |
+|---------|------|
+| `omnibioai-tes` | Primary consumer — routes HTTP tool requests to ToolServer |
+| `omnibioai-api-gateway` | JWT enforcement on all ToolServer requests |
+| `omnibioai-control-center` | Health monitoring (toolserver:9090) |
+| `omnibioai-studio` | Manages ToolServer container lifecycle |
+
+---
+
 ## Status
 
-* **Frozen initial release**
-* Enrichr pathway enrichment working end-to-end with TES
-* Stable API contract
+| Feature | Status |
+|---------|--------|
+| Enrichr pathway enrichment | ✓ Stable |
+| TES HttpToolServerAdapter integration | ✓ Stable |
+| Health endpoint | ✓ Stable |
+| REST tool lifecycle (submit/poll/results) | ✓ Stable |
+| Test coverage | ✓ 100% |
+| Docker Compose deployment | ✓ Stable |
 
