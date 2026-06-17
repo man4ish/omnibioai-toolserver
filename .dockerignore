@@ -6,8 +6,8 @@ __pycache__/
 .env
 .venv/
 venv/
-build/
-dist/
+**/build
+**/dist
 .eggs/
 *.egg-info/
 out/
@@ -16,3 +16,13 @@ logs/
 .mypy_cache/
 .ipynb_checkpoints/
 .DS_Store
+.claude
+.coverage
+coverage.json
+**/.nextflow
+**/nf-test
+**/.nf-test
+htmlcov/
+.benchmarks/
+perf_baseline.json
+**/node_modules
